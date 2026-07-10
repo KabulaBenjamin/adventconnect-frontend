@@ -1,0 +1,14 @@
+  const initiateCall = async (type: 'video' | 'audio') => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        video: type === 'video', 
+        audio: true 
+      });
+      setLocalStream(stream);
+      setCallType(type);
+      setCallStatus('calling');
+      socketRef.current?.emit('initiate_call', { to: selectedUser._id, type });
+    } catch (err) {
+      alert("Please allow camera/mic access in the permission settings.");
+    }
+  };
