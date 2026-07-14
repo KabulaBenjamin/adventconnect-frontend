@@ -18,7 +18,8 @@ const Sidebar = ({ isCollapsed, setIsCollapsed }: SidebarProps) => {
     { name: 'Home', icon: <Home size={18} />, path: '/feed' },
     { name: 'Library', icon: <Library size={18} />, path: '/library' },
     { name: 'Devotionals', icon: <BookOpen size={18} />, path: '/devotionals' },
-    { name: 'Chat Room', icon: <MessageCircle size={18} />, path: '/chat' },
+    // 🔥 FIXED: Aligned path to match your App.tsx router mapping
+    { name: 'Chat Room', icon: <MessageCircle size={18} />, path: '/messages' },
     { name: 'Music Challenges', icon: <Flame size={18} className="text-amber-500 animate-pulse" />, path: '/challenges' },
     { name: 'Ministries', icon: <Users size={18} />, path: '/ministries' },
     { name: 'Gatherings', icon: <Calendar size={18} />, path: '/meetings' },

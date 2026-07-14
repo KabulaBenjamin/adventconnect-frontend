@@ -7,7 +7,7 @@ import axios from 'axios';
 
 // Components
 import SanctuaryLibrary from "./components/SanctuaryLibrary";
-import MusicChallenges from "./components/MusicChallenges";
+import ChallengeManager from "./components/ChallengeManager"; 
 import SearchPage from "./components/SearchPage";
 
 // Pages
@@ -17,7 +17,6 @@ import Register from './pages/Register';
 import Onboarding from './pages/Onboarding';
 import AdminDashboard from './pages/AdminDashboard';
 import Settings from './pages/Settings';
-import Chat from './pages/Chat';
 import Trivia from './pages/Trivia';
 import Devotionals from './pages/Devotionals';
 import Groups from './pages/Groups';
@@ -25,8 +24,9 @@ import Events from './pages/Events';
 import Meeting from './pages/Meeting';
 import MeetingsList from './pages/MeetingsList';
 import Live from './pages/Live';
+import Messages from './pages/Messages';
 
-// Robust, pre-logged helper function to inspect tokens at runtime
+// Robust helper to inspect and sanitize tokens at runtime
 const getCleanToken = (): string | null => {
   const token = localStorage.getItem('token');
   console.log("🔍 [Interceptor Diagnosis] Raw storage token value:", token);
@@ -54,28 +54,35 @@ axios.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// 2. GLOBAL NATIVE FETCH INTERCEPTOR
+// 2. SAFE GLOBAL NATIVE FETCH INTERCEPTOR (Prevents Header Mutation Crashes)
 const { fetch: originalFetch } = window;
 window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
   let config = init ? { ...init } : {};
-  config.headers = config.headers || {};
-
   const token = getCleanToken();
+
   if (token) {
+    // Case A: Headers is an instance of native Headers (creates a safe, mutable copy)
     if (config.headers instanceof Headers) {
-      if (!config.headers.has('Authorization')) {
-        config.headers.set('Authorization', `Bearer ${token}`);
+      const mutableHeaders = new Headers(config.headers);
+      if (!mutableHeaders.has('Authorization')) {
+        mutableHeaders.set('Authorization', `Bearer ${token}`);
       }
-    } else if (Array.isArray(config.headers)) {
+      config.headers = mutableHeaders;
+    } 
+    // Case B: Headers is an Array of [key, value] pairs
+    else if (Array.isArray(config.headers)) {
       const hasAuth = config.headers.some(([key]) => key.toLowerCase() === 'authorization');
       if (!hasAuth) {
         config.headers.push(['Authorization', `Bearer ${token}`]);
       }
-    } else {
-      const hasAuth = Object.keys(config.headers).some(key => key.toLowerCase() === 'authorization');
+    } 
+    // Case C: Headers is a plain object
+    else {
+      const headersObj = (config.headers || {}) as Record<string, string>;
+      const hasAuth = Object.keys(headersObj).some(key => key.toLowerCase() === 'authorization');
       if (!hasAuth) {
         config.headers = {
-          ...config.headers,
+          ...headersObj,
           'Authorization': `Bearer ${token}`
         };
       }
@@ -103,14 +110,16 @@ function App() {
             <Route path="/" element={<Navigate to="/feed" replace />} />
             <Route path="/feed" element={<Layout><Feed /></Layout>} />
             <Route path="/search" element={<Layout><SearchPage /></Layout>} />
-            <Route path="/chat" element={<Layout><Chat /></Layout>} />
-            <Route path="/messages" element={<Layout><Chat /></Layout>} />
+            
+            {/* Rendered standalone to bypass Navbar/Layout structural crashes */}
+            <Route path="/messages" element={<Messages />} />
+            
             <Route path="/groups" element={<Layout><Groups /></Layout>} />
             <Route path="/meetings" element={<Layout><MeetingsList /></Layout>} />
             <Route path="/trivia" element={<Layout><Trivia /></Layout>} />
             <Route path="/events" element={<Layout><Events /></Layout>} />
             <Route path="/live" element={<Layout><Live /></Layout>} />
-            <Route path="/challenges" element={<Layout><MusicChallenges /></Layout>} />
+            <Route path="/challenges" element={<Layout><ChallengeManager /></Layout>} />
             <Route path="/settings" element={<Layout><Settings /></Layout>} />
             <Route path="/admin" element={<Layout><AdminDashboard /></Layout>} />
             <Route path="/library" element={<Layout><SanctuaryLibrary /></Layout>} />
