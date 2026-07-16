@@ -1,3 +1,6 @@
+// Dynamically resolve the backend base URL (Production vs Development)
+const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000';
+
 export const apiFetch = async (endpoint: string, options: any = {}) => {
   const token = localStorage.getItem('token');
   const customHeaders = options.headers || {};
@@ -17,7 +20,8 @@ export const apiFetch = async (endpoint: string, options: any = {}) => {
   const formattedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
 
   try {
-    const response = await fetch(`http://localhost:4000/api${formattedEndpoint}`, {
+    // 🚀 Now pointing to either Render URL or Localhost depending on where it is built
+    const response = await fetch(`${BASE_URL}/api${formattedEndpoint}`, {
       ...options,
       headers,
     });
