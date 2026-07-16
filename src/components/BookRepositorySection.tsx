@@ -28,7 +28,7 @@ export default function BookRepositorySection() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [fileBase64, setFileBase64] = useState<string>('');
 
-  const getBaseUrl = () => window.location.origin.includes('localhost') ? 'http://localhost:4000' : window.location.origin;
+  const getBaseUrl = () => "https://adventconnect-7jfq.onrender.com";
 
   const loadRepository = async () => {
     setLoading(true);

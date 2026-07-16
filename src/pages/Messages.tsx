@@ -123,8 +123,8 @@ const Messages: React.FC = () => {
   useEffect(() => {
     if (!myId) return;
 
-    // Dynamically retrieve base API url or fall back to localhost
-    const apiBaseUrl = (import.meta as any).env?.VITE_API_BASE_URL || 'http://localhost:4000';
+    // Use production base API url
+    const apiBaseUrl = "https://adventconnect-7jfq.onrender.com";
     
     // Initialize production-ready Socket connection
     socketRef.current = io(apiBaseUrl);
@@ -144,7 +144,7 @@ const Messages: React.FC = () => {
       const envPath = (import.meta as any).env?.VITE_PEER_PATH as string | undefined;
 
       // Production fallback settings
-      const peerHost = envHost || 'localhost';
+      const peerHost = "adventconnect-7jfq.onrender.com";
       const peerPort = envPort ? parseInt(envPort, 10) : 4000;
       const peerPath = envPath || '/peerjs';
       const isSecure = envHost ? (import.meta as any).env?.DEV === false : false;

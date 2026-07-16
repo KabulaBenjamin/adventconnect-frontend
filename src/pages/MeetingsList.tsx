@@ -26,7 +26,7 @@ export default function MeetingsList() {
       ...options.headers
     };
 
-    const res = await fetch(`http://localhost:4000/api${url}`, { ...options, headers });
+    const res = await fetch(`https://adventconnect-7jfq.onrender.com/api${url}`, { ...options, headers });
     if (!res.ok) throw new Error(`HTTP Error: ${res.status}`);
     return res.json();
   };

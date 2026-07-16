@@ -19,7 +19,7 @@ export default function AdventConnectMeet({ roomId = "SabbathSchool", user }: { 
 
   const initMeeting = async () => {
     try {
-      const res = await fetch(`http://localhost:4000/api/library/meet/session?roomId=${roomId}`);
+      const res = await fetch(`https://adventconnect-7jfq.onrender.com/api/library/meet/session?roomId=${roomId}`);
       const data = await res.json();
 
       if (meetContainerRef.current && window.JitsiMeetExternalAPI) {

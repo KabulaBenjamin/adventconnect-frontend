@@ -47,7 +47,7 @@ const ChallengeManager: React.FC = () => {
     
     // Normalize string format so it handles missing or double slash prefixes smoothly
     const sanitizedUrl = rawUrl.startsWith("/") ? rawUrl : `/${rawUrl}`;
-    const fullAudioUrl = `http://localhost:4000${sanitizedUrl}`;
+    const fullAudioUrl = `https://adventconnect-7jfq.onrender.com${sanitizedUrl}`;
 
     return (
       <RemixStudio 

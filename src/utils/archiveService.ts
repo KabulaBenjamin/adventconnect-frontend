@@ -2,20 +2,20 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import axios from 'axios';
 
+const BACKEND_URL = 'https://adventconnect-7jfq.onrender.com';
+
 export const exportSermonArchive = async (roomId: string, messages: any[], user: string) => {
   const doc = new jsPDF();
   const date = new Date().toLocaleDateString();
 
-  // PDF Styling
   doc.setFontSize(22);
-  doc.setTextColor(25, 118, 210); // SDA Blue
+  doc.setTextColor(25, 118, 210);
   doc.text('ADVENTCONNECT: SERVICE ARCHIVE', 14, 22);
   
   doc.setFontSize(10);
   doc.setTextColor(100);
   doc.text(`Room: ${roomId} | Date: ${date} | Archived by: ${user}`, 14, 30);
 
-  // Table Generation
   autoTable(doc, {
     startY: 40,
     head: [['Time', 'Member', 'Message']],
@@ -28,10 +28,8 @@ export const exportSermonArchive = async (roomId: string, messages: any[], user:
     headStyles: { fillColor: [25, 118, 210] }
   });
 
-  // 1. Download locally
   doc.save(`Sermon_Archive_${roomId}.pdf`);
 
-  // 2. Upload to Cloud
   const pdfBlob = doc.output('blob');
   const formData = new FormData();
   formData.append('pdf', pdfBlob, `Archive_${roomId}.pdf`);
@@ -40,7 +38,7 @@ export const exportSermonArchive = async (roomId: string, messages: any[], user:
   formData.append('archivedBy', user);
 
   try {
-    await axios.post('http://localhost:4000/api/meetings/upload-archive', formData, {
+    await axios.post(`${BACKEND_URL}/api/meetings/upload-archive`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' }
     });
     console.log("Archive synced to Sanctuary Cloud.");

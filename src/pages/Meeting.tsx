@@ -49,7 +49,7 @@ const Meeting = () => {
     const verifyRoomAuthority = async () => {
       try {
         const token = localStorage.getItem('token');
-        const res = await fetch(`http://localhost:4000/api/meetings/verify/${roomId}`, {
+        const res = await fetch(`https://adventconnect-7jfq.onrender.com/api/meetings/verify/${roomId}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         if (res.ok) {
@@ -74,7 +74,7 @@ const Meeting = () => {
 
   // 2. Real-time Socket Handshake Lifecycle Connection
   useEffect(() => {
-    socketRef.current = io('http://localhost:4000');
+    socketRef.current = io('https://adventconnect-7jfq.onrender.com');
 
     if (roomId && user) {
       socketRef.current.emit('knock_room', { roomId, user });
@@ -172,9 +172,9 @@ const Meeting = () => {
   const fetchLibraryData = async () => {
     setLoadingLibrary(true);
     try {
-      let url = 'http://localhost:4000/api/library/hymns';
-      if (libraryTab === 'lessons') url = 'http://localhost:4000/api/library/devotional/lesson';
-      if (libraryTab === 'books') url = 'http://localhost:4000/api/library/egw-search';
+      let url = 'https://adventconnect-7jfq.onrender.com/api/library/hymns';
+      if (libraryTab === 'lessons') url = 'https://adventconnect-7jfq.onrender.com/api/library/devotional/lesson';
+      if (libraryTab === 'books') url = 'https://adventconnect-7jfq.onrender.com/api/library/egw-search';
 
       const res = await fetch(url);
       if (!res.ok) throw new Error();
@@ -221,7 +221,7 @@ const Meeting = () => {
     try {
       setShareStatus('broadcasting');
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:4000/api/meetings/share-feed', {
+      const response = await fetch('https://adventconnect-7jfq.onrender.com/api/meetings/share-feed', {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',

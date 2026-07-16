@@ -9,7 +9,7 @@ const Devotion = () => {
   const [isAmen, setIsAmen] = useState(false);
 
   const fetchTodayDevotion = () => {
-    fetch('http://localhost:4000/devotion/today', {
+    fetch('https://adventconnect-7jfq.onrender.com/devotion/today', {
       headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
     })
       .then(res => res.json())
@@ -34,7 +34,7 @@ const Devotion = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const res = await fetch('http://localhost:4000/devotion', {
+    const res = await fetch('https://adventconnect-7jfq.onrender.com/devotion', {
       method: 'POST',
       headers: { 
         'Content-Type': 'application/json',

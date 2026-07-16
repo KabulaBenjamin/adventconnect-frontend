@@ -27,9 +27,7 @@ export default function BibleSection({ isCompact }: { isCompact: boolean }) {
       setError('');
       try {
         // Fallback to local address if window origin isn't available
-        const baseUrl = window.location.origin.includes('localhost') 
-          ? 'http://localhost:4000' 
-          : window.location.origin;
+        const baseUrl = "https://adventconnect-7jfq.onrender.com";
 
         const res = await fetch(`${baseUrl}/api/library/bible/chapter?book=${encodeURIComponent(book)}&chapter=${chapter}`);
         

@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Heart, Trash2, Edit2, Share2, Globe, Plus, Flame } from "lucide-react";
 import axios from "axios";
 
-const ASSET_BASE_URL = "http://localhost:4000";
+const ASSET_BASE_URL = "https://adventconnect-7jfq.onrender.com";
 
 interface ChallengeUser {
   _id: string;

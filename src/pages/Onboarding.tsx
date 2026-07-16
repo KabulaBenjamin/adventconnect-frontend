@@ -35,7 +35,7 @@ const Onboarding = () => {
   const handleCompletePipeline = async () => {
     setLoading(true);
     try {
-      const apiUrl = import.meta.env?.VITE_API_URL || 'http://localhost:4000/api';
+      const apiUrl = import.meta.env?.VITE_API_URL || 'https://adventconnect-7jfq.onrender.com/api';
       let token = localStorage.getItem('token');
 
       // Clean quotes if wrapped

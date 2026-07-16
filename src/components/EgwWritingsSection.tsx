@@ -23,7 +23,7 @@ export default function EgwWritingsSection() {
   const [code, setCode] = useState('');
   const [fullContent, setFullContent] = useState('');
 
-  const getBaseUrl = () => window.location.origin.includes('localhost') ? 'http://localhost:4000' : window.location.origin;
+  const getBaseUrl = () => "https://adventconnect-7jfq.onrender.com";
 
   const fetchEgwCatalog = async () => {
     setLoading(true);

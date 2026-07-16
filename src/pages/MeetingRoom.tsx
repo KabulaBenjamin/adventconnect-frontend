@@ -25,7 +25,7 @@ export default function MeetingRoom() {
       try {
         const token = localStorage.getItem('token');
         // Targets your exact backend process running on port 4000
-        const res = await fetch(`http://localhost:4000/api/meetings/verify/${roomId}`, {
+        const res = await fetch(`https://adventconnect-7jfq.onrender.com/api/meetings/verify/${roomId}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
 
@@ -96,7 +96,7 @@ export default function MeetingRoom() {
     try {
       setShareStatus('broadcasting');
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:4000/api/meetings/share-feed', {
+      const response = await fetch('https://adventconnect-7jfq.onrender.com/api/meetings/share-feed', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

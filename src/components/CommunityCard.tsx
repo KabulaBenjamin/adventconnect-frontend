@@ -41,7 +41,7 @@ export const ChallengeManager: React.FC = () => {
   if (activeRemixTrack) {
     const rawUrl = activeRemixTrack.audioSourceUrl || activeRemixTrack.videoUrl || "";
     const sanitizedUrl = rawUrl.startsWith("/") ? rawUrl : `/${rawUrl}`;
-    const fullAudioUrl = `http://localhost:4000${sanitizedUrl}`;
+    const fullAudioUrl = `https://adventconnect-7jfq.onrender.com${sanitizedUrl}`;
 
     return (
       <RemixStudio

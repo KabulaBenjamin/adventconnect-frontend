@@ -7,7 +7,7 @@ const AdminDashboard = () => {
   const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
-    fetch('http://localhost:4000/admin/stats', {
+    fetch('https://adventconnect-7jfq.onrender.com/admin/stats', {
       headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
     })
     .then(res => res.json())
