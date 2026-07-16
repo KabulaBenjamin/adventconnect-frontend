@@ -1,5 +1,6 @@
-// Dynamically resolve the backend base URL (Production fallback included)
-const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://adventconnect-7jfq.onrender.com';
+// HARDCODED: This forces the application to ignore local environment variables 
+// and always point to your production Render backend.
+const BASE_URL = 'https://adventconnect-7jfq.onrender.com';
 
 export const apiFetch = async (endpoint: string, options: any = {}) => {
   const token = localStorage.getItem('token');
@@ -20,7 +21,7 @@ export const apiFetch = async (endpoint: string, options: any = {}) => {
   const formattedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
 
   try {
-    // 🚀 Now pointing to either Render URL or the explicit production fallback
+    // 🚀 Pointing directly to production backend
     const response = await fetch(`${BASE_URL}/api${formattedEndpoint}`, {
       ...options,
       headers,
@@ -30,7 +31,6 @@ export const apiFetch = async (endpoint: string, options: any = {}) => {
     if (response.status === 401) {
       console.warn(`[API 401] Session invalid or expired on: /api${formattedEndpoint}`);
       
-      // If we aren't already navigating to the login page, wipe stale data and redirect
       if (!window.location.pathname.includes('/login')) {
         localStorage.removeItem('token');
         localStorage.removeItem('user');
@@ -43,8 +43,8 @@ export const apiFetch = async (endpoint: string, options: any = {}) => {
     if (contentType && contentType.includes("application/json")) {
       const parsedData = await response.json();
 
-      // Normalize response so it matches component structures perfectly
-      if (endpoint.includes('posts') && Array.isArray(parsedData) && !parsedData.posts) {
+      // FIXED: Type-safe normalization for posts
+      if (endpoint.includes('posts') && Array.isArray(parsedData)) {
         return { posts: parsedData };
       }
       return parsedData;
