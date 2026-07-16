@@ -383,7 +383,7 @@ const PostItem = ({ post, user, fetchPosts }: any) => {
             {post.content.split("👉")[0]}
           </p>
           {(() => {
-            const match = post.content.match(/https://adventconnect-7jfq\.onrender\.com/meeting/[a-zA-Z0-9_-]+/);
+            const match = post.content.match(new RegExp("https://adventconnect-7jfq\\.onrender\\.com/meeting/[a-zA-Z0-9_-]+"));
             const url = match ? match[0] : "#";
             return (
               <a
