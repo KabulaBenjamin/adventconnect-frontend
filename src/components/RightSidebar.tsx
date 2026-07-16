@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Compass, Calendar, ArrowUpRight, Sliders, ShieldCheck } from 'lucide-react';
-import FriendRequests from './FriendRequests';
+import FriendRequests from './FriendRequests.js';
 
 export default function RightSidebar() {
   const [engineActive, setEngineActive] = useState(true);

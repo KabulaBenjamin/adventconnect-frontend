@@ -1,44 +1,23 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, User, LogOut, Clock, X, UserCheck, UserPlus, Check, Loader2, Trash2 } from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
-import { useNavigate } from 'react-router-dom';
-import NotificationDropdown from './NotificationDropdown';
-import { apiFetch } from '../lib/api';
-
-interface FriendItem {
-  _id: string;
-  username: string;
-  localChurch?: string;
-  status?: string;
-}
-
-interface SuggestionItem {
-  _id: string;
-  username: string;
-  localChurch?: string;
-}
+import { Search, User, LogOut, Clock, X, Users, Loader2, Trash2 } from 'lucide-react';
+import { useAuth } from '../context/AuthContext.js';
+import { useNavigate, useLocation } from 'react-router-dom';
+import NotificationDropdown from './NotificationDropdown.js';
+import { apiFetch } from '../lib/api.js';
 
 const Topbar = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [isFocused, setIsFocused] = useState(false);
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
   const dropdownRef = useRef<HTMLDivElement>(null);
-  const friendsRef = useRef<HTMLDivElement>(null);
-  const suggestionsRef = useRef<HTMLDivElement>(null);
   const accountRef = useRef<HTMLDivElement>(null);
 
-  // Independent Dropdown States
-  const [activeDropdown, setActiveDropdown] = useState<'friends' | 'suggestions' | 'account' | null>(null);
-  const [friendTab, setFriendTab] = useState<'requests' | 'list'>('requests');
-
-  // Live Data States
-  const [friendsList, setFriendsList] = useState<FriendItem[]>([]);
-  const [friendRequests, setFriendRequests] = useState<FriendItem[]>([]);
-  const [suggestions, setSuggestions] = useState<SuggestionItem[]>([]);
-  const [loading, setLoading] = useState(false);
+  // Dropdown & Deleting States
+  const [activeDropdown, setActiveDropdown] = useState<'account' | null>(null);
   const [deleting, setDeleting] = useState(false);
 
   // Load search history safely on initialization
@@ -47,17 +26,11 @@ const Topbar = () => {
     if (history) setRecentSearches(JSON.parse(history));
   }, []);
 
-  // Handle outside click closures for search overlay and custom dropdowns
+  // Handle outside click closures for search overlay and account dropdown
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setIsFocused(false);
-      }
-      if (friendsRef.current && !friendsRef.current.contains(event.target as Node)) {
-        if (activeDropdown === 'friends') setActiveDropdown(null);
-      }
-      if (suggestionsRef.current && !suggestionsRef.current.contains(event.target as Node)) {
-        if (activeDropdown === 'suggestions') setActiveDropdown(null);
       }
       if (accountRef.current && !accountRef.current.contains(event.target as Node)) {
         if (activeDropdown === 'account') setActiveDropdown(null);
@@ -90,71 +63,8 @@ const Topbar = () => {
     }
   };
 
-  const fetchFriendsData = async () => {
-    setLoading(true);
-    try {
-      const requestsData = await apiFetch('/users/friend-requests/pending');
-      if (Array.isArray(requestsData)) setFriendRequests(requestsData);
-
-      const workspaceResponse = await apiFetch('/users/me');
-      if (workspaceResponse?.status === 'success' && workspaceResponse?.space?.friends) {
-        setFriendsList(workspaceResponse.space.friends);
-      }
-    } catch (err) {
-      console.error("Failed to fetch friends data:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchSuggestionsData = async () => {
-    setLoading(true);
-    try {
-      const data = await apiFetch('/users/suggestions');
-      if (Array.isArray(data)) setSuggestions(data);
-    } catch (err) {
-      console.error("Failed to retrieve suggestions:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const toggleDropdown = (type: 'friends' | 'suggestions' | 'account') => {
-    if (activeDropdown === type) {
-      setActiveDropdown(null);
-    } else {
-      setActiveDropdown(type);
-      if (type === 'friends') fetchFriendsData();
-      if (type === 'suggestions') fetchSuggestionsData();
-    }
-  };
-
-  const handleAcceptRequest = async (requestId: string) => {
-    try {
-      await apiFetch(`/users/friend-request/accept/${requestId}`, { method: 'POST' });
-      setFriendRequests(prev => prev.filter(req => req._id !== requestId));
-      fetchFriendsData();
-    } catch (err) {
-      console.error("Error accepting request:", err);
-    }
-  };
-
-  const handleRejectRequest = async (requestId: string) => {
-    try {
-      await apiFetch(`/users/friend-request/reject/${requestId}`, { method: 'POST' });
-      setFriendRequests(prev => prev.filter(req => req._id !== requestId));
-    } catch (err) {
-      console.error("Error declining request:", err);
-    }
-  };
-
-  const handleSendConnection = async (targetUserId: string) => {
-    try {
-      await apiFetch(`/users/friend-request/${targetUserId}`, { method: 'POST' });
-      setSuggestions(prev => prev.filter(sug => sug._id !== targetUserId));
-    } catch (err) {
-      console.error("Failed to send connection request:", err);
-    }
+  const toggleDropdown = (type: 'account') => {
+    setActiveDropdown(activeDropdown === type ? null : type);
   };
 
   const executeSearch = (queryStr: string) => {
@@ -176,6 +86,9 @@ const Topbar = () => {
     setRecentSearches(updated);
     localStorage.setItem('sanctuary_searches', JSON.stringify(updated));
   };
+
+  // Check if we are currently on the Friends Hub page
+  const isFriendsActive = location.pathname === '/friends';
 
   return (
     <div className="h-20 bg-white/80 backdrop-blur-md border-b border-gray-100 px-8 flex items-center justify-between sticky top-0 z-40">
@@ -241,82 +154,23 @@ const Topbar = () => {
 
       <div className="flex items-center gap-4">
         
-        {/* FRIENDS DIRECTORY ACCORDION */}
-        <div className="relative" ref={friendsRef}>
-          <button
-            onClick={() => toggleDropdown('friends')}
-            className={`p-2.5 rounded-xl border transition relative duration-150 flex items-center justify-center cursor-pointer ${
-              activeDropdown === 'friends' ? 'bg-blue-50 border-blue-200 text-blue-600' : 'bg-gray-50 border-transparent text-gray-500 hover:bg-gray-100'
-            }`}
-          >
-            <UserCheck size={18} />
-            {friendRequests.length > 0 && <span className="absolute top-1 right-1 w-2 h-2 bg-blue-600 rounded-full animate-pulse" />}
-          </button>
-
-          {activeDropdown === 'friends' && (
-            <div className="absolute right-0 mt-3 w-80 bg-white border border-gray-100 shadow-2xl rounded-2xl py-3 flex flex-col max-h-[400px] z-50">
-              <div className="flex border-b border-gray-50 px-4 text-[10px] font-black tracking-wider uppercase mb-1">
-                <button onClick={() => setFriendTab('requests')} className={`flex-1 pb-2 pt-1 border-b-2 text-center ${friendTab === 'requests' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-400'}`}>Requests ({friendRequests.length})</button>
-                <button onClick={() => setFriendTab('list')} className={`flex-1 pb-2 pt-1 border-b-2 text-center ${friendTab === 'list' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-400'}`}>Friends ({friendsList.length})</button>
-              </div>
-              <div className="overflow-y-auto flex-1 p-2 max-h-[280px]">
-                {loading ? <div className="text-center py-6 text-xs text-gray-400">Loading...</div> : friendTab === 'requests' ? (
-                  friendRequests.length === 0 ? <p className="text-xs text-gray-400 text-center py-6 italic">No pending requests.</p> : friendRequests.map(req => (
-                    <div key={req._id} className="flex items-center gap-3 p-2 hover:bg-gray-50 rounded-xl transition">
-                      <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-xs shrink-0">{req.username?.[0]?.toUpperCase()}</div>
-                      <div className="flex-1 min-w-0"><p className="text-xs font-bold text-gray-800 truncate">{req.username}</p></div>
-                      <div className="flex gap-1 shrink-0">
-                        <button onClick={() => handleAcceptRequest(req._id)} className="p-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700"><Check size={12} /></button>
-                        <button onClick={() => handleRejectRequest(req._id)} className="p-1 bg-gray-100 text-gray-400 rounded-lg hover:bg-gray-200"><X size={12} /></button>
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  friendsList.length === 0 ? <p className="text-xs text-gray-400 text-center py-6 italic">No friends connected yet.</p> : friendsList.map(friend => (
-                    <div key={friend._id} className="flex items-center gap-3 p-2 hover:bg-gray-50 rounded-xl transition">
-                      <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold text-xs shrink-0">{friend.username?.[0]?.toUpperCase()}</div>
-                      <div className="flex-1 min-w-0"><p className="text-xs font-bold text-gray-800 truncate">{friend.username}</p></div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* RECS DROP PANEL */}
-        <div className="relative" ref={suggestionsRef}>
-          <button
-            onClick={() => toggleDropdown('suggestions')}
-            className={`p-2.5 rounded-xl border transition duration-150 flex items-center justify-center cursor-pointer ${
-              activeDropdown === 'suggestions' ? 'bg-purple-50 border-purple-200 text-purple-600' : 'bg-gray-50 border-transparent text-gray-500 hover:bg-gray-100'
-            }`}
-          >
-            <UserPlus size={18} />
-          </button>
-
-          {activeDropdown === 'suggestions' && (
-            <div className="absolute right-0 mt-3 w-80 bg-white border border-gray-100 shadow-2xl rounded-2xl py-3 flex flex-col max-h-[400px] z-50">
-              <div className="px-4 py-1 border-b border-gray-50 mb-1"><h3 className="text-[10px] font-black tracking-wider uppercase text-purple-600">People You May Know</h3></div>
-              <div className="overflow-y-auto flex-1 p-2 space-y-1 max-h-[280px]">
-                {loading ? <div className="text-center py-6 text-xs text-gray-400">Loading...</div> : suggestions.length === 0 ? <p className="text-xs text-gray-400 text-center py-6 italic">No suggestions.</p> : suggestions.map(sug => (
-                  <div key={sug._id} className="flex items-center justify-between gap-3 p-2 hover:bg-gray-50 rounded-xl transition">
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center font-bold text-xs shrink-0">{sug.username?.[0]?.toUpperCase()}</div>
-                      <p className="text-xs font-bold text-gray-800 truncate">{sug.username}</p>
-                    </div>
-                    <button onClick={() => handleSendConnection(sug._id)} className="px-3 py-1 bg-purple-50 text-purple-600 text-[10px] font-bold rounded-lg hover:bg-purple-100">Connect</button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
+        {/* 👥 FRIENDS HUB BUTTON */}
+        <button
+          onClick={() => navigate('/friends')}
+          className={`p-2.5 rounded-xl border transition duration-150 flex items-center justify-center cursor-pointer ${
+            isFriendsActive 
+              ? 'bg-blue-50 border-blue-200 text-blue-600' 
+              : 'bg-gray-50 border-transparent text-gray-500 hover:bg-gray-100 hover:text-gray-700'
+          }`}
+          title="Friends Hub"
+        >
+          <Users size={18} />
+        </button>
 
         <NotificationDropdown />
 
         {/* ⚙️ USER SETTINGS & DESTRUCTION HUB */}
-        <div className="flex items-center gap-3 pl-4 border-l border-gray-100" ref={accountRef}>
+        <div className="flex items-center gap-3 pl-4 border-l border-gray-100 relative" ref={accountRef}>
           <div className="text-right hidden sm:block">
             <p className="text-sm font-black text-gray-900 leading-none">{user?.username || 'Brethren'}</p>
             <button

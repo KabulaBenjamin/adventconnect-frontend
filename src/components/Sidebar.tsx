@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+// FIX: Added the explicit .js extension to satisfy ESM resolution rules
+import { useAuth } from '../context/AuthContext.js';
 import {
   Home, Users, Calendar, BookOpen, Settings, Gamepad2, Library, MessageCircle, Flame, ShieldCheck, LogOut
 } from 'lucide-react';
@@ -18,7 +19,6 @@ const Sidebar = ({ isCollapsed, setIsCollapsed }: SidebarProps) => {
     { name: 'Home', icon: <Home size={18} />, path: '/feed' },
     { name: 'Library', icon: <Library size={18} />, path: '/library' },
     { name: 'Devotionals', icon: <BookOpen size={18} />, path: '/devotionals' },
-    // 🔥 FIXED: Aligned path to match your App.tsx router mapping
     { name: 'Chat Room', icon: <MessageCircle size={18} />, path: '/messages' },
     { name: 'Music Challenges', icon: <Flame size={18} className="text-amber-500 animate-pulse" />, path: '/challenges' },
     { name: 'Ministries', icon: <Users size={18} />, path: '/ministries' },

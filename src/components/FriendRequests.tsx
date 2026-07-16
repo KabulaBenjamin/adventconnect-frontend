@@ -1,35 +1,15 @@
-import React, { useEffect, useState } from 'react';
-import { apiFetch } from '../lib/api';
-import { useAuth } from '../context/AuthContext';
+import React from 'react';
+import { useAuth } from '../context/AuthContext.js';
+import { useSocial } from '../context/SocialContext.js';
 import { Check, X, BellDot } from 'lucide-react';
 
 const FriendRequests = () => {
   const { user } = useAuth();
-  const [requests, setRequests] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { requests, acceptFriendRequest, declineFriendRequest, loading } = useSocial();
 
-  useEffect(() => {
-    if (!user?._id) return;
+  const userId = user?._id || user?.id;
 
-    const fetchRequests = async () => {
-      try {
-        const response = await apiFetch('/users/friend-requests/pending');
-        if (Array.isArray(response)) {
-          setRequests(response);
-        } else if (response?.requests) {
-          setRequests(response.requests);
-        }
-      } catch (error) {
-        console.log("Friend requests skipped or pending session verification.");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchRequests();
-  }, [user?._id]);
-
-  if (!user?._id || loading || requests.length === 0) return null;
+  if (!userId || loading || requests.length === 0) return null;
 
   return (
     <div className="bg-gradient-to-br from-amber-500/5 to-orange-500/5 border border-amber-500/20 rounded-2xl p-4 text-left shadow-2xs">
@@ -44,10 +24,18 @@ const FriendRequests = () => {
               {req.sender?.username || 'New User'}
             </span>
             <div className="flex gap-1 shrink-0">
-              <button className="p-1 bg-slate-900 text-white rounded-lg hover:bg-blue-600 transition cursor-pointer flex items-center justify-center">
+              <button 
+                onClick={() => acceptFriendRequest(req._id)}
+                className="p-1 bg-slate-900 text-white rounded-lg hover:bg-blue-600 transition cursor-pointer flex items-center justify-center"
+                title="Accept Request"
+              >
                 <Check size={11} strokeWidth={2.5} />
               </button>
-              <button className="p-1 bg-slate-100 text-slate-400 hover:text-slate-800 rounded-lg transition cursor-pointer flex items-center justify-center">
+              <button 
+                onClick={() => declineFriendRequest(req._id)}
+                className="p-1 bg-slate-100 text-slate-400 hover:text-slate-800 rounded-lg transition cursor-pointer flex items-center justify-center"
+                title="Decline Request"
+              >
                 <X size={11} />
               </button>
             </div>

@@ -1,14 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { io, Socket } from 'socket.io-client';
-import Peer from 'peerjs';
-import { useAuth } from '../context/AuthContext';
-import { apiFetch } from '../lib/api';
+import { Peer } from 'peerjs';
+import { useAuth } from '../context/AuthContext.js';
+import { apiFetch } from '../lib/api.js';
+import { useNavigate } from 'react-router-dom';
 import {
-  Send, Smile, Paperclip, Phone, Video, X, PhoneOff, Hash, Info, Lock,
-  Mail, Share2, Users, ThumbsUp, Type, ShieldCheck, Clock, Eye, Ban, AlertTriangle,
-  Search, UserPlus, Check, Image as ImageIcon
+  Send, Smile, PhoneOff, Info, Video, Search, Users, Image as ImageIcon
 } from 'lucide-react';
-import EmojiPicker, { Theme } from 'emoji-picker-react';
+
+// Safe imports for emoji-picker-react v4+
+import EmojiPicker, { Theme, EmojiClickData } from 'emoji-picker-react';
 
 // Ready-to-use vector sticker assets library
 const STICKERS = [
@@ -22,14 +23,40 @@ const STICKERS = [
 
 const REACTION_OPTIONS = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
 
-const Messages = () => {
-  const { user } = useAuth();
-  const [connectedFriends, setConnectedFriends] = useState<any[]>([]);
-  const [peopleYouMayKnow, setPeopleYouMayKnow] = useState<any[]>([]);
-  const [sentRequests, setSentRequests] = useState<string[]>([]);
+interface Reaction {
+  userId: string;
+  emoji: string;
+}
 
-  const [selectedUser, setSelectedUser] = useState<any>(null);
-  const [messages, setMessages] = useState<any[]>([]);
+interface Message {
+  _id?: string;
+  tempId?: string;
+  sender?: any; // String ID or populated object
+  senderId?: string;
+  recipient?: string;
+  receiverId?: string;
+  text: string;
+  mediaUrl?: string;
+  messageType: 'text' | 'sticker';
+  reactions?: Reaction[];
+  createdAt?: string;
+  timestamp?: string;
+}
+
+interface UserProfile {
+  _id: string;
+  username: string;
+  localChurch?: string;
+}
+
+const Messages: React.FC = () => {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const [connectedFriends, setConnectedFriends] = useState<UserProfile[]>([]);
+  const [onlineUsers, setOnlineUsers] = useState<string[]>([]); // Dynamic presence
+
+  const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [text, setText] = useState('');
   const [showEmoji, setShowEmoji] = useState(false);
   const [showStickers, setShowStickers] = useState(false);
@@ -49,12 +76,19 @@ const Messages = () => {
 
   const socketRef = useRef<Socket | null>(null);
   const peerRef = useRef<Peer | null>(null);
+  
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  // Safely extract own ID from dynamic user object structure
+  const myId = user?._id ? String(user._id) : (user?.id ? String(user.id) : '');
+
+  // Computed presence check
+  const isSelectedUserOnline = selectedUser ? onlineUsers.includes(selectedUser._id) : false;
+
   // Safe Helper: Format timestamps without throwing runtime crashes
-  const formatMessageTime = (msg: any): string => {
+  const formatMessageTime = (msg: Message): string => {
     if (msg.timestamp) return msg.timestamp;
     if (!msg.createdAt) return '';
     try {
@@ -67,18 +101,32 @@ const Messages = () => {
   };
 
   useEffect(() => {
-    if (!user) return;
+    if (!myId) return;
 
     socketRef.current = io('http://localhost:4000');
-    socketRef.current.emit('register', user._id);
+    socketRef.current.emit('register', myId);
 
-    // 🔥 FIXED: Wrapped PeerJS initialization inside safe exception scope to avoid fatal silent crashing
+    // Listen for real-time presence lists
+    socketRef.current.on('online_users', (usersList: string[]) => {
+      setOnlineUsers(usersList);
+    });
+
     let peer: Peer | null = null;
     try {
-      peer = new Peer(user._id, {
-        host: '/',
-        port: 9000,
-        path: '/peerjs'
+      const envHost = (import.meta as any).env?.VITE_PEER_HOST as string | undefined;
+      const envPort = (import.meta as any).env?.VITE_PEER_PORT as string | undefined;
+      const envPath = (import.meta as any).env?.VITE_PEER_PATH as string | undefined;
+
+      const peerHost = envHost || '0.peerjs.com';
+      const peerPort = envPort ? parseInt(envPort, 10) : 443;
+      const peerPath = envPath || '/';
+      const isSecure = envHost ? (import.meta as any).env?.DEV === false : true;
+
+      peer = new Peer(myId, {
+        host: peerHost,
+        port: peerPort,
+        path: peerPath,
+        secure: isSecure
       });
       peerRef.current = peer;
 
@@ -87,7 +135,7 @@ const Messages = () => {
       });
 
       peer.on('error', (err) => {
-        console.warn("⚠️ PeerJS client encountered a routing issue. Call capabilities disabled. Normal chat is active.", err.message);
+        console.warn("⚠️ PeerJS client encountered a routing issue. Call capabilities disabled.", err.message);
       });
 
       peer.on('call', (call) => {
@@ -102,7 +150,7 @@ const Messages = () => {
         });
       });
     } catch (err) {
-      console.warn("❌ Could not bind PeerJS client to local application framework:", err);
+      console.warn("❌ Could not bind PeerJS client framework:", err);
     }
 
     fetchDirectory();
@@ -118,7 +166,7 @@ const Messages = () => {
       }
       localStream?.getTracks().forEach(t => t.stop());
     };
-  }, [user]);
+  }, [myId]);
 
   // Real-time listener for incoming messages, reactions, and read receipts
   useEffect(() => {
@@ -127,16 +175,17 @@ const Messages = () => {
     socketRef.current.off('receive_message');
     socketRef.current.off('receive_reaction');
 
-    socketRef.current.on('receive_message', (msg: any) => {
-      const matchId = msg.senderId || msg.sender;
-      const targetId = msg.receiverId || msg.recipient;
-      if (selectedUser && (matchId === selectedUser._id || targetId === selectedUser._id)) {
+    socketRef.current.on('receive_message', (msg: Message) => {
+      const msgSenderId = typeof msg.sender === 'object' ? msg.sender?._id : (msg.senderId || msg.sender);
+      const msgReceiverId = typeof msg.recipient === 'object' ? msg.recipient?._id : (msg.receiverId || msg.recipient);
+
+      if (selectedUser && (String(msgSenderId) === String(selectedUser._id) || String(msgReceiverId) === String(selectedUser._id))) {
         setMessages((prev) => [...prev, msg]);
         triggerMarkAsRead();
       }
     });
 
-    socketRef.current.on('receive_reaction', (reactionData: any) => {
+    socketRef.current.on('receive_reaction', (reactionData: { messageId: string; reactions: Reaction[] }) => {
       setMessages((prev) =>
         prev.map((m) => {
           const mId = m._id || m.tempId;
@@ -161,7 +210,6 @@ const Messages = () => {
       try {
         const response = await apiFetch(`/messages/${selectedUser._id}?page=1&limit=20`);
         
-        // Defensive Check: Handle both backend pagination formats and legacy flat arrays
         if (Array.isArray(response)) {
           setMessages(response);
           setHasMore(false);
@@ -188,7 +236,6 @@ const Messages = () => {
     scrollRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [localStream, remoteStream, messages]);
 
-  // Helper: Trigger Mark As Read
   const triggerMarkAsRead = async () => {
     if (!selectedUser) return;
     try {
@@ -198,7 +245,6 @@ const Messages = () => {
     }
   };
 
-  // Load older paginated messages
   const loadMoreMessages = async () => {
     if (!selectedUser || isLoadingMore || !hasMore) return;
     setIsLoadingMore(true);
@@ -227,31 +273,20 @@ const Messages = () => {
     try {
       const data = await apiFetch('/users/chat-directory');
       setConnectedFriends(data.friends || []);
-      setPeopleYouMayKnow(data.suggestions || []);
     } catch (err) {
       console.error("Failed to fetch chat directory data", err);
     }
   };
 
-  const handleSendFriendRequest = async (targetId: string) => {
-    try {
-      await apiFetch(`/users/friend-request/${targetId}`, { method: 'POST' });
-      setSentRequests((prev) => [...prev, targetId]);
-    } catch (err) {
-      console.error("Could not complete friend request", err);
-    }
-  };
-
-  // Sender loop
   const handleSendMessagePayload = async (payloadText: string, messageType: 'text' | 'sticker' = 'text', mediaUrl?: string) => {
-    if (!selectedUser) return;
+    if (!selectedUser || !myId) return;
 
     const tempId = 'temp-' + Date.now();
-    const msgData = {
+    const msgData: Message = {
       _id: tempId,
       tempId: tempId,
-      sender: user?._id,
-      senderId: user?._id,
+      sender: myId,
+      senderId: myId,
       recipient: selectedUser._id,
       receiverId: selectedUser._id,
       text: payloadText,
@@ -277,7 +312,7 @@ const Messages = () => {
 
       socketRef.current?.emit('send_message', {
         ...savedMsg,
-        senderId: user?._id,
+        senderId: myId,
         receiverId: selectedUser._id
       });
     } catch (err) {
@@ -298,9 +333,9 @@ const Messages = () => {
     setShowStickers(false);
   };
 
-  const handleToggleReaction = async (message: any, emoji: string) => {
+  const handleToggleReaction = async (message: Message, emoji: string) => {
     const messageId = message._id;
-    if (!messageId || messageId.startsWith('temp-')) return;
+    if (!messageId || messageId.startsWith('temp-') || !selectedUser) return;
 
     try {
       const updatedReactions = await apiFetch(`/messages/reaction/${messageId}`, {
@@ -308,7 +343,6 @@ const Messages = () => {
         body: JSON.stringify({ emoji })
       });
 
-      // Secure both structure options (raw array or nested object reactions)
       const resolvedReactions = Array.isArray(updatedReactions) 
         ? updatedReactions 
         : (updatedReactions?.reactions || []);
@@ -335,7 +369,7 @@ const Messages = () => {
 
       if (peerRef.current) {
         const call = peerRef.current.call(userId, stream);
-        call?.on('stream', (userRemoteStream) => {
+        call?.on('stream', (userRemoteStream: MediaStream) => {
           setRemoteStream(userRemoteStream);
           setCallStatus('active');
         });
@@ -395,53 +429,49 @@ const Messages = () => {
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-2 pb-4 space-y-5">
-          <div>
-            <div className="px-3 pb-1.5 flex justify-between items-center">
-              <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Connected Friends</span>
-            </div>
-            <div className="space-y-0.5">
-              {connectedFriends.filter(u => u.username?.toLowerCase().includes(searchQuery.toLowerCase())).map(u => (
-                <div
-                  key={u._id}
-                  onClick={() => setSelectedUser(u)}
-                  className={`p-2.5 rounded-xl cursor-pointer flex items-center gap-3 transition ${
-                    selectedUser?._id === u._id ? 'bg-zinc-800 border border-zinc-700/30' : 'hover:bg-zinc-900/60'
-                  }`}
-                >
-                  <div className="w-9 h-9 rounded-full bg-blue-600 flex items-center justify-center font-bold text-xs">
-                    {u.username?.charAt(0).toUpperCase()}
-                  </div>
-                  <span className="text-xs font-semibold tracking-wide truncate">{u.username}</span>
-                </div>
-              ))}
+        {/* MANAGED DIRECTORY FLOW */}
+        <div className="flex-1 overflow-y-auto px-2 pb-4 flex flex-col justify-between">
+          <div className="space-y-5">
+            <div>
+              <div className="px-3 pb-1.5 flex justify-between items-center">
+                <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Connected Friends</span>
+              </div>
+              <div className="space-y-0.5">
+                {connectedFriends.filter(u => u.username?.toLowerCase().includes(searchQuery.toLowerCase())).map(u => {
+                  const isOnline = onlineUsers.includes(u._id);
+                  return (
+                    <div
+                      key={u._id}
+                      onClick={() => setSelectedUser(u)}
+                      className={`p-2.5 rounded-xl cursor-pointer flex items-center justify-between transition ${
+                        selectedUser?._id === u._id ? 'bg-zinc-800 border border-zinc-700/30' : 'hover:bg-zinc-900/60'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="relative w-9 h-9 rounded-full bg-blue-600 flex items-center justify-center font-bold text-xs">
+                          {u.username?.charAt(0).toUpperCase()}
+                          <span className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-[#121212] ${
+                            isOnline ? 'bg-emerald-500' : 'bg-zinc-500'
+                          }`} />
+                        </div>
+                        <span className="text-xs font-semibold tracking-wide truncate">{u.username}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
 
-          <div>
-            <div className="px-3 pb-2">
-              <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">People You May Know</span>
-            </div>
-            <div className="space-y-0.5">
-              {peopleYouMayKnow.filter(u => u.username?.toLowerCase().includes(searchQuery.toLowerCase())).map(u => (
-                <div key={u._id} className="p-2.5 rounded-xl flex items-center justify-between hover:bg-zinc-900/40">
-                  <div className="flex items-center gap-3 cursor-pointer" onClick={() => setSelectedUser(u)}>
-                    <div className="w-9 h-9 rounded-full bg-zinc-900 border border-zinc-800 flex items-center justify-center text-xs">
-                      {u.username?.charAt(0).toUpperCase()}
-                    </div>
-                    <div className="flex flex-col">
-                      <span className="text-xs font-medium text-zinc-300">{u.username}</span>
-                      <span className="text-[10px] text-zinc-600 -mt-0.5">{u.localChurch || 'Global Member'}</span>
-                    </div>
-                  </div>
-                  {sentRequests.includes(u._id) ? (
-                    <button disabled className="p-1.5 bg-zinc-800 text-emerald-500 rounded-lg"><Check size={13} /></button>
-                  ) : (
-                    <button onClick={() => handleSendFriendRequest(u._id)} className="p-1.5 bg-zinc-800 hover:bg-blue-600 rounded-lg cursor-pointer"><UserPlus size={13} /></button>
-                  )}
-                </div>
-              ))}
-            </div>
+          {/* REDIRECT TO FRIENDS HUB PANEL */}
+          <div className="p-2 border-t border-zinc-900 bg-[#121212] mt-auto">
+            <button
+              onClick={() => navigate('/friends')}
+              className="w-full py-2.5 px-3 bg-zinc-800/80 hover:bg-blue-600 text-white rounded-xl transition flex items-center justify-center gap-2 text-xs font-bold tracking-wide cursor-pointer group"
+            >
+              <Users size={15} className="text-zinc-400 group-hover:text-white transition-colors" />
+              Manage Connections
+            </button>
           </div>
         </div>
       </div>
@@ -452,12 +482,16 @@ const Messages = () => {
           <>
             <div className="p-4 border-b border-zinc-900 flex justify-between items-center bg-[#121212]/95 backdrop-blur-md z-10">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-zinc-800 rounded-xl flex items-center justify-center font-bold text-base">
+                <div className="w-10 h-10 bg-zinc-800 rounded-xl flex items-center justify-center font-bold text-base relative">
                   {selectedUser.username?.charAt(0).toUpperCase()}
                 </div>
                 <div>
                   <div className="font-bold text-sm tracking-wide text-white">{selectedUser.username}</div>
-                  <span className="text-[10px] font-semibold text-emerald-400 uppercase tracking-wider block">Active Now</span>
+                  <span className={`text-[10px] font-semibold uppercase tracking-wider block ${
+                    isSelectedUserOnline ? 'text-emerald-400' : 'text-zinc-500'
+                  }`}>
+                    {isSelectedUserOnline ? 'Active Now' : 'Offline'}
+                  </span>
                 </div>
               </div>
               <div className="flex items-center gap-1">
@@ -471,9 +505,8 @@ const Messages = () => {
             </div>
 
             {/* MESSAGE TIMELINE FLOW */}
-            <div className="flex-1 bg-[#121212] p-5 overflow-y-auto space-y-6">
+            <div className="flex-1 bg-[#121212] p-5 overflow-y-auto space-y-4 flex flex-col w-full">
               
-              {/* Pagination load action bubble */}
               {hasMore && (
                 <div className="flex justify-center w-full">
                   <button 
@@ -488,57 +521,72 @@ const Messages = () => {
               )}
 
               {messages.map((msg, i) => {
-                const isMe = (msg.senderId || msg.sender) === user?._id;
+                let senderId = '';
+                if (msg.sender) {
+                  if (typeof msg.sender === 'object') {
+                    senderId = msg.sender._id ? String(msg.sender._id) : (msg.sender.id ? String(msg.sender.id) : String(msg.sender));
+                  } else {
+                    senderId = String(msg.sender);
+                  }
+                } else if (msg.senderId) {
+                  senderId = String(msg.senderId);
+                }
+
+                const isMe = senderId.toLowerCase() === myId.toLowerCase();
                 const msgId = msg._id || msg.tempId;
                 
                 return (
                   <div
                     key={msgId || i}
-                    className={`flex flex-col relative group ${isMe ? 'items-end' : 'items-start'}`}
-                    onMouseEnter={() => setHoveredMessageId(msgId)}
-                    onMouseLeave={() => setHoveredMessageId(null)}
+                    className={`flex w-full ${isMe ? 'justify-end' : 'justify-start'}`}
                   >
-                    {/* INLINE REACTION PICKER */}
-                    {hoveredMessageId === msgId && msgId && !msgId.startsWith('temp-') && (
-                      <div className={`absolute -top-8 z-20 bg-zinc-900 border border-zinc-800 rounded-full px-2 py-1 shadow-xl flex gap-1.5 animate-fade-in ${isMe ? 'right-2' : 'left-2'}`}>
-                        {REACTION_OPTIONS.map((emoji) => (
-                          <button
-                            key={emoji}
-                            onClick={() => handleToggleReaction(msg, emoji)}
-                            className="hover:scale-125 transition transform duration-150 cursor-pointer text-sm"
-                          >
-                            {emoji}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-
-                    {/* MESSAGE BOX */}
-                    <div className={`max-w-xs sm:max-w-md p-3 rounded-2xl relative ${
-                      isMe
-                        ? 'bg-blue-600 text-white rounded-tr-none font-medium' 
-                        : 'bg-zinc-800 text-zinc-100 rounded-tl-none font-normal border border-zinc-700/40' 
-                    }`}>
-                      {msg.messageType === 'sticker' ? (
-                        <img src={msg.mediaUrl} alt="sticker" className="w-28 h-28 object-contain my-1" />
-                      ) : (
-                        <p className="text-xs tracking-wide leading-relaxed break-words">{msg.text}</p>
-                      )}
-
-                      {/* Reactions display layout */}
-                      {msg.reactions && msg.reactions.length > 0 && (
-                        <div className="absolute -bottom-2.5 left-2 bg-zinc-900 border border-zinc-800 rounded-full px-1.5 py-0.5 text-[10px] flex items-center gap-1 shadow-md">
-                          {Array.from(new Set(msg.reactions.map((r: any) => r.emoji))).map((emoji: any, idx) => (
-                            <span key={idx}>{emoji}</span>
+                    <div
+                      className={`flex flex-col relative group max-w-[70%] ${isMe ? 'items-end' : 'items-start'}`}
+                      onMouseEnter={() => setHoveredMessageId(msgId || null)}
+                      onMouseLeave={() => setHoveredMessageId(null)}
+                    >
+                      {/* INLINE REACTION PICKER */}
+                      {hoveredMessageId === msgId && msgId && !msgId.startsWith('temp-') && (
+                        <div className={`absolute -top-8 z-20 bg-zinc-900 border border-zinc-800 rounded-full px-2 py-1 shadow-xl flex gap-1.5 animate-fade-in ${isMe ? 'right-2' : 'left-2'}`}>
+                          {REACTION_OPTIONS.map((emoji) => (
+                            <button
+                              key={emoji}
+                              type="button"
+                              onClick={() => handleToggleReaction(msg, emoji)}
+                              className="hover:scale-125 transition transform duration-150 cursor-pointer text-sm"
+                            >
+                              {emoji}
+                            </button>
                           ))}
-                          {msg.reactions.length > 1 && (
-                            <span className="text-zinc-500 font-semibold text-[8px]">{msg.reactions.length}</span>
-                          )}
                         </div>
                       )}
 
-                      <div className="text-[8px] mt-1.5 opacity-40 text-right">
-                        {formatMessageTime(msg)}
+                      {/* MESSAGE BOX */}
+                      <div className={`p-3 rounded-2xl relative ${
+                        isMe
+                          ? 'bg-blue-600 text-white rounded-tr-none font-medium text-right' 
+                          : 'bg-zinc-800 text-zinc-100 rounded-tl-none font-normal text-left border border-zinc-700/40' 
+                      }`}>
+                        {msg.messageType === 'sticker' ? (
+                          <img src={msg.mediaUrl} alt="sticker" className="w-28 h-28 object-contain my-1" />
+                        ) : (
+                          <p className="text-xs tracking-wide leading-relaxed break-words">{msg.text}</p>
+                        )}
+
+                        {msg.reactions && msg.reactions.length > 0 && (
+                          <div className="absolute -bottom-2.5 left-2 bg-zinc-900 border border-zinc-800 rounded-full px-1.5 py-0.5 text-[10px] flex items-center gap-1 shadow-md">
+                            {Array.from(new Set(msg.reactions.map((r: any) => r.emoji))).map((emoji: any, idx) => (
+                              <span key={idx}>{emoji}</span>
+                            ))}
+                            {msg.reactions.length > 1 && (
+                              <span className="text-zinc-500 font-semibold text-[8px]">{msg.reactions.length}</span>
+                            )}
+                          </div>
+                        )}
+
+                        <div className="text-[8px] mt-1.5 opacity-40 text-right">
+                          {formatMessageTime(msg)}
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -549,11 +597,14 @@ const Messages = () => {
 
             {/* INPUT ELEMENT ACTIONS BAR */}
             <form onSubmit={sendMessage} className="p-4 border-t border-zinc-900 bg-[#121212] flex items-center gap-2 relative">
+              
               {showEmoji && (
                 <div className="absolute bottom-16 left-4 z-50">
                   <EmojiPicker
                     theme={Theme.DARK}
-                    onEmojiClick={(emojiData) => setText((prev) => prev + emojiData.emoji)}
+                    onEmojiClick={(emojiData: EmojiClickData) => {
+                      setText((prev) => prev + emojiData.emoji);
+                    }}
                   />
                 </div>
               )}
@@ -586,39 +637,3 @@ const Messages = () => {
               <button
                 type="button"
                 onClick={() => setShowStickers(!showStickers)}
-                className="p-2.5 text-zinc-400 hover:text-white rounded-xl cursor-pointer"
-              >
-                <ImageIcon size={18} />
-              </button>
-
-              <input
-                type="text"
-                value={text}
-                onChange={(e) => setText(e.target.value)}
-                placeholder="Write your message..."
-                className="flex-1 bg-zinc-800/60 text-white text-xs px-4 py-2.5 rounded-xl border border-transparent focus:outline-none focus:border-zinc-700/50"
-              />
-
-              <button
-                type="submit"
-                className="p-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl cursor-pointer transition flex items-center justify-center shrink-0"
-              >
-                <Send size={16} />
-              </button>
-            </form>
-          </>
-        ) : (
-          <div className="flex-1 flex flex-col items-center justify-center text-center p-6">
-            <div className="w-16 h-16 bg-zinc-900 rounded-3xl border border-zinc-800 flex items-center justify-center text-blue-500 mb-4">
-              <Hash size={24} />
-            </div>
-            <h3 className="font-bold text-sm tracking-wide text-white">No Conversation Active</h3>
-            <p className="text-xs text-zinc-500 mt-1 max-w-xs">Select a verified connection in your directory to begin exchange paths safely.</p>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-};
-
-export default Messages;

@@ -1,30 +1,32 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider, useAuth } from './context/AuthContext';
-import PrivateRoute from './components/PrivateRoute';
-import Layout from './components/Layout';
+import { AuthProvider, useAuth } from './context/AuthContext.js';
+import { SocialProvider } from './context/SocialContext.js';
+import PrivateRoute from './components/PrivateRoute.js';
+import Layout from './components/Layout.js';
 import axios from 'axios';
 
 // Components
-import SanctuaryLibrary from "./components/SanctuaryLibrary";
-import ChallengeManager from "./components/ChallengeManager"; 
-import SearchPage from "./components/SearchPage";
+import SanctuaryLibrary from "./components/SanctuaryLibrary.js";
+import ChallengeManager from "./components/ChallengeManager.js"; 
+import SearchPage from "./components/SearchPage.js";
 
 // Pages
-import Feed from './pages/Feed';
-import Login from './pages/Login';
-import Register from './pages/Register';
-import Onboarding from './pages/Onboarding';
-import AdminDashboard from './pages/AdminDashboard';
-import Settings from './pages/Settings';
-import Trivia from './pages/Trivia';
-import Devotionals from './pages/Devotionals';
-import Groups from './pages/Groups';
-import Events from './pages/Events';
-import Meeting from './pages/Meeting';
-import MeetingsList from './pages/MeetingsList';
-import Live from './pages/Live';
-import Messages from './pages/Messages';
+import Feed from './pages/Feed.js';
+import Login from './pages/Login.js';
+import Register from './pages/Register.js';
+import Onboarding from './pages/Onboarding.js';
+import AdminDashboard from './pages/AdminDashboard.js';
+import Settings from './pages/Settings.js';
+import Trivia from './pages/Trivia.js';
+import Devotionals from './pages/Devotionals.js';
+import Groups from './pages/Groups.js';
+import Events from './pages/Events.js';
+import Meeting from './pages/Meeting.js';
+import MeetingsList from './pages/MeetingsList.js';
+import Live from './pages/Live.js';
+import Messages from './pages/Messages.js';
+import FriendsHub from './pages/FriendsHub.js'; // Added Friends Portal
 
 // Robust helper to inspect and sanitize tokens at runtime
 const getCleanToken = (): string | null => {
@@ -61,7 +63,6 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
   const token = getCleanToken();
 
   if (token) {
-    // Case A: Headers is an instance of native Headers (creates a safe, mutable copy)
     if (config.headers instanceof Headers) {
       const mutableHeaders = new Headers(config.headers);
       if (!mutableHeaders.has('Authorization')) {
@@ -69,14 +70,12 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
       }
       config.headers = mutableHeaders;
     } 
-    // Case B: Headers is an Array of [key, value] pairs
     else if (Array.isArray(config.headers)) {
       const hasAuth = config.headers.some(([key]) => key.toLowerCase() === 'authorization');
       if (!hasAuth) {
         config.headers.push(['Authorization', `Bearer ${token}`]);
       }
     } 
-    // Case C: Headers is a plain object
     else {
       const headersObj = (config.headers || {}) as Record<string, string>;
       const hasAuth = Object.keys(headersObj).some(key => key.toLowerCase() === 'authorization');
@@ -100,36 +99,41 @@ const CatchAllRoute = () => {
 function App() {
   return (
     <AuthProvider>
-      <Router>
-        <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
-          <Route path="/onboarding" element={<Onboarding />} />
+      <SocialProvider>
+        <Router>
+          <Routes>
+            <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Register />} />
+            <Route path="/onboarding" element={<Onboarding />} />
 
-          <Route element={<PrivateRoute />}>
-            <Route path="/" element={<Navigate to="/feed" replace />} />
-            <Route path="/feed" element={<Layout><Feed /></Layout>} />
-            <Route path="/search" element={<Layout><SearchPage /></Layout>} />
-            
-            {/* Rendered standalone to bypass Navbar/Layout structural crashes */}
-            <Route path="/messages" element={<Messages />} />
-            
-            <Route path="/groups" element={<Layout><Groups /></Layout>} />
-            <Route path="/meetings" element={<Layout><MeetingsList /></Layout>} />
-            <Route path="/trivia" element={<Layout><Trivia /></Layout>} />
-            <Route path="/events" element={<Layout><Events /></Layout>} />
-            <Route path="/live" element={<Layout><Live /></Layout>} />
-            <Route path="/challenges" element={<Layout><ChallengeManager /></Layout>} />
-            <Route path="/settings" element={<Layout><Settings /></Layout>} />
-            <Route path="/admin" element={<Layout><AdminDashboard /></Layout>} />
-            <Route path="/library" element={<Layout><SanctuaryLibrary /></Layout>} />
-            <Route path="/devotionals" element={<Layout><Devotionals /></Layout>} />
-            <Route path="/meeting/:roomId" element={<Meeting />} />
-          </Route>
+            <Route element={<PrivateRoute />}>
+              <Route path="/" element={<Navigate to="/feed" replace />} />
+              <Route path="/feed" element={<Layout><Feed /></Layout>} />
+              <Route path="/search" element={<Layout><SearchPage /></Layout>} />
+              
+              <Route path="/messages" element={<Messages />} />
+              
+              <Route path="/groups" element={<Layout><Groups /></Layout>} />
+              <Route path="/meetings" element={<Layout><MeetingsList /></Layout>} />
+              <Route path="/trivia" element={<Layout><Trivia /></Layout>} />
+              <Route path="/events" element={<Layout><Events /></Layout>} />
+              <Route path="/live" element={<Layout><Live /></Layout>} />
+              <Route path="/challenges" element={<Layout><ChallengeManager /></Layout>} />
+              <Route path="/settings" element={<Layout><Settings /></Layout>} />
+              <Route path="/admin" element={<Layout><AdminDashboard /></Layout>} />
+              <Route path="/library" element={<Layout><SanctuaryLibrary /></Layout>} />
+              <Route path="/devotionals" element={<Layout><Devotionals /></Layout>} />
+              
+              {/* Connected Friends Portal Route */}
+              <Route path="/friends" element={<Layout><FriendsHub /></Layout>} />
+              
+              <Route path="/meeting/:roomId" element={<Meeting />} />
+            </Route>
 
-          <Route path="*" element={<CatchAllRoute />} />
-        </Routes>
-      </Router>
+            <Route path="*" element={<CatchAllRoute />} />
+          </Routes>
+        </Router>
+      </SocialProvider>
     </AuthProvider>
   );
 }
