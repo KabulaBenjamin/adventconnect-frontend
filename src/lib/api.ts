@@ -1,5 +1,5 @@
-// Dynamically resolve the backend base URL (Production vs Development)
-const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000';
+// Dynamically resolve the backend base URL (Production fallback included)
+const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://adventconnect-7jfq.onrender.com';
 
 export const apiFetch = async (endpoint: string, options: any = {}) => {
   const token = localStorage.getItem('token');
@@ -20,7 +20,7 @@ export const apiFetch = async (endpoint: string, options: any = {}) => {
   const formattedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
 
   try {
-    // 🚀 Now pointing to either Render URL or Localhost depending on where it is built
+    // 🚀 Now pointing to either Render URL or the explicit production fallback
     const response = await fetch(`${BASE_URL}/api${formattedEndpoint}`, {
       ...options,
       headers,
