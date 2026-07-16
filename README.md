@@ -1,16 +1,25 @@
-# React + Vite
+# AdventConnect
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+AdventConnect is a comprehensive, faith-based community platform designed to unify fellowship, administration, and spiritual growth in one digital space.
 
-Currently, two official plugins are available:
+## 🌟 What We Do
+AdventConnect removes geographical boundaries, allowing community members to stay connected, informed, and spiritually active. Our platform serves as a digital home for members and leaders alike.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+### Key Features
+* **Real-time Fellowship:** Join live meetings via integrated video conferencing, perfect for sermons, Bible studies, and prayer gatherings.
+* **Spiritual Resources:** Access a curated library of hymns, devotionals, and study materials to nourish your daily faith.
+* **Community Feed:** Stay updated with community news, share reflections, and interact with fellow members.
+* **Administrative Oversight:** A dedicated SuperUser panel enables leadership to manage members, verify pages, and oversee platform health efficiently.
+* **Resource Sharing:** Easily archive sermon notes and share important documents across the community.
 
-## React Compiler
+## 🔗 Access the Platform
+You can access our live community portal here:
+👉 **[AdventConnect Portal](https://adventconnect-frontend.onrender.com)**
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## 🛠️ Built With
+* **Frontend:** React, Vite, Tailwind CSS, Lucide Icons.
+* **Backend:** Node.js, Express, MongoDB.
+* **Real-time:** Socket.io, PeerJS, Jitsi Meet API.
 
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+---
+*Created to foster connection, growth, and community.*
