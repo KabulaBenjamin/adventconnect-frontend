@@ -80,6 +80,11 @@ const Messages: React.FC = () => {
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const timelineContainerRef = useRef<HTMLDivElement>(null);
+
+  // Refs for click outside handling
+  const emojiContainerRef = useRef<HTMLDivElement>(null);
+  const stickerContainerRef = useRef<HTMLDivElement>(null);
 
   // Safely extract own ID from dynamic user object structure
   const myId = user?._id ? String(user._id) : (user?.id ? String(user.id) : '');
@@ -100,10 +105,29 @@ const Messages: React.FC = () => {
     }
   };
 
+  // Click outside hooks for UI Popovers
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (showEmoji && emojiContainerRef.current && !emojiContainerRef.current.contains(event.target as Node)) {
+        setShowEmoji(false);
+      }
+      if (showStickers && stickerContainerRef.current && !stickerContainerRef.current.contains(event.target as Node)) {
+        setShowStickers(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showEmoji, showStickers]);
+
+  // Integrated PeerJS double-mount prevention & error suppression
   useEffect(() => {
     if (!myId) return;
 
-    socketRef.current = io('http://localhost:4000');
+    // Dynamically retrieve base API url or fall back to localhost
+    const apiBaseUrl = (import.meta as any).env?.VITE_API_BASE_URL || 'http://localhost:4000';
+    
+    // Initialize production-ready Socket connection
+    socketRef.current = io(apiBaseUrl);
     socketRef.current.emit('register', myId);
 
     // Listen for real-time presence lists
@@ -112,33 +136,40 @@ const Messages: React.FC = () => {
     });
 
     let peer: Peer | null = null;
+    let isDestroyed = false; // Local flag to block duplicate socket interactions
+
     try {
       const envHost = (import.meta as any).env?.VITE_PEER_HOST as string | undefined;
       const envPort = (import.meta as any).env?.VITE_PEER_PORT as string | undefined;
       const envPath = (import.meta as any).env?.VITE_PEER_PATH as string | undefined;
 
-      const peerHost = envHost || '0.peerjs.com';
-      const peerPort = envPort ? parseInt(envPort, 10) : 443;
-      const peerPath = envPath || '/';
-      const isSecure = envHost ? (import.meta as any).env?.DEV === false : true;
+      // Production fallback settings
+      const peerHost = envHost || 'localhost';
+      const peerPort = envPort ? parseInt(envPort, 10) : 4000;
+      const peerPath = envPath || '/peerjs';
+      const isSecure = envHost ? (import.meta as any).env?.DEV === false : false;
 
       peer = new Peer(myId, {
         host: peerHost,
         port: peerPort,
         path: peerPath,
-        secure: isSecure
+        secure: isSecure,
+        debug: 1 // Limits noisy handshake reports
       });
       peerRef.current = peer;
 
       peer.on('open', (id) => {
+        if (isDestroyed) return;
         console.log(`PeerJS Client linked successfully under user: ${id}`);
       });
 
       peer.on('error', (err) => {
-        console.warn("⚠️ PeerJS client encountered a routing issue. Call capabilities disabled.", err.message);
+        if (isDestroyed) return;
+        console.warn("⚠️ PeerJS client routing issue (call features disabled):", err.message);
       });
 
       peer.on('call', (call) => {
+        if (isDestroyed) return;
         setCallStatus('incoming');
         navigator.mediaDevices.getUserMedia({ video: true, audio: true }).then((stream) => {
           setLocalStream(stream);
@@ -147,6 +178,9 @@ const Messages: React.FC = () => {
             setRemoteStream(userRemoteStream);
             setCallStatus('active');
           });
+        }).catch((err) => {
+          console.error("Failed to fetch stream during incoming call", err);
+          setCallStatus('idle');
         });
       });
     } catch (err) {
@@ -156,10 +190,15 @@ const Messages: React.FC = () => {
     fetchDirectory();
 
     return () => {
+      isDestroyed = true;
       socketRef.current?.disconnect();
+      
       if (peer) {
         try {
-          peer.destroy();
+          // Delayed destruction prevents connection dropouts on instant dev-mode hot reloads
+          setTimeout(() => {
+            peer?.destroy();
+          }, 100);
         } catch (destroyErr) {
           console.warn("Clean teardown bypass achieved", destroyErr);
         }
@@ -182,6 +221,8 @@ const Messages: React.FC = () => {
       if (selectedUser && (String(msgSenderId) === String(selectedUser._id) || String(msgReceiverId) === String(selectedUser._id))) {
         setMessages((prev) => [...prev, msg]);
         triggerMarkAsRead();
+        // Auto scroll down to incoming messages
+        setTimeout(() => scrollRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
       }
     });
 
@@ -220,6 +261,8 @@ const Messages: React.FC = () => {
         
         setCurrentPage(1);
         triggerMarkAsRead();
+        // Force snap scroll downward on initial load
+        setTimeout(() => scrollRef.current?.scrollIntoView({ behavior: 'auto' }), 50);
       } catch (err) {
         console.error("Failed loading chat history logs", err);
         setMessages([]);
@@ -233,8 +276,7 @@ const Messages: React.FC = () => {
   useEffect(() => {
     if (localVideoRef.current && localStream) localVideoRef.current.srcObject = localStream;
     if (remoteVideoRef.current && remoteStream) remoteVideoRef.current.srcObject = remoteStream;
-    scrollRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [localStream, remoteStream, messages]);
+  }, [localStream, remoteStream]);
 
   const triggerMarkAsRead = async () => {
     if (!selectedUser) return;
@@ -246,8 +288,14 @@ const Messages: React.FC = () => {
   };
 
   const loadMoreMessages = async () => {
-    if (!selectedUser || isLoadingMore || !hasMore) return;
+    if (!selectedUser || isLoadingMore || !hasMore || !timelineContainerRef.current) return;
     setIsLoadingMore(true);
+    
+    // Track current scroll heights to avoid violent window jumps during pagination prepend
+    const container = timelineContainerRef.current;
+    const previousScrollHeight = container.scrollHeight;
+    const previousScrollTop = container.scrollTop;
+
     try {
       const nextPage = currentPage + 1;
       const response = await apiFetch(`/messages/${selectedUser._id}?page=${nextPage}&limit=20`);
@@ -259,6 +307,12 @@ const Messages: React.FC = () => {
         setMessages((prev) => [...newMessages, ...prev]);
         setCurrentPage(nextPage);
         setHasMore(nextHasMore);
+
+        // Adjust scrollbar dynamically to anchor visual content
+        requestAnimationFrame(() => {
+          const delta = container.scrollHeight - previousScrollHeight;
+          container.scrollTop = previousScrollTop + delta;
+        });
       } else {
         setHasMore(false);
       }
@@ -272,7 +326,8 @@ const Messages: React.FC = () => {
   const fetchDirectory = async () => {
     try {
       const data = await apiFetch('/users/chat-directory');
-      setConnectedFriends(data.friends || []);
+      // Handles both direct array structure and objects wrapped with key friends
+      setConnectedFriends(Array.isArray(data) ? data : (data.friends || []));
     } catch (err) {
       console.error("Failed to fetch chat directory data", err);
     }
@@ -297,6 +352,7 @@ const Messages: React.FC = () => {
     };
 
     setMessages((prev) => [...prev, msgData]);
+    setTimeout(() => scrollRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
 
     try {
       const savedMsg = await apiFetch(`/messages/${selectedUser._id}`, {
@@ -375,6 +431,7 @@ const Messages: React.FC = () => {
         });
       } else {
         console.warn("Cannot call: Peer client server instance is not active.");
+        stream.getTracks().forEach(track => track.stop());
         setCallStatus('idle');
       }
     } catch (err) {
@@ -385,6 +442,7 @@ const Messages: React.FC = () => {
 
   const endCall = () => {
     localStream?.getTracks().forEach(t => t.stop());
+    remoteStream?.getTracks().forEach(t => t.stop());
     setLocalStream(null);
     setRemoteStream(null);
     setCallStatus('idle');
@@ -404,7 +462,7 @@ const Messages: React.FC = () => {
               <video ref={localVideoRef} autoPlay muted playsInline className="w-full h-full object-cover scale-x-[-1]" />
             </div>
           </div>
-          <button onClick={endCall} className="mt-8 w-14 h-14 bg-rose-600 rounded-full flex items-center justify-center cursor-pointer shadow-lg">
+          <button onClick={endCall} className="mt-8 w-14 h-14 bg-rose-600 rounded-full flex items-center justify-center cursor-pointer shadow-lg hover:bg-rose-500 transition-colors">
             <PhoneOff size={24} />
           </button>
         </div>
@@ -505,7 +563,7 @@ const Messages: React.FC = () => {
             </div>
 
             {/* MESSAGE TIMELINE FLOW */}
-            <div className="flex-1 bg-[#121212] p-5 overflow-y-auto space-y-4 flex flex-col w-full">
+            <div ref={timelineContainerRef} className="flex-1 bg-[#121212] p-5 overflow-y-auto space-y-4 flex flex-col w-full">
               
               {hasMore && (
                 <div className="flex justify-center w-full">
@@ -599,7 +657,7 @@ const Messages: React.FC = () => {
             <form onSubmit={sendMessage} className="p-4 border-t border-zinc-900 bg-[#121212] flex items-center gap-2 relative">
               
               {showEmoji && (
-                <div className="absolute bottom-16 left-4 z-50">
+                <div ref={emojiContainerRef} className="absolute bottom-16 left-4 z-50">
                   <EmojiPicker
                     theme={Theme.DARK}
                     onEmojiClick={(emojiData: EmojiClickData) => {
@@ -610,7 +668,7 @@ const Messages: React.FC = () => {
               )}
 
               {showStickers && (
-                <div className="absolute bottom-16 left-12 z-50 bg-[#1a1a1a] border border-zinc-800 p-3 rounded-2xl shadow-2xl w-64">
+                <div ref={stickerContainerRef} className="absolute bottom-16 left-12 z-50 bg-[#1a1a1a] border border-zinc-800 p-3 rounded-2xl shadow-2xl w-64">
                   <div className="grid grid-cols-3 gap-2">
                     {STICKERS.map((stk) => (
                       <button
@@ -637,3 +695,66 @@ const Messages: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setShowStickers(!showStickers)}
+                className="p-2.5 text-zinc-400 hover:text-white rounded-xl cursor-pointer"
+              >
+                <ImageIcon size={18} />
+              </button>
+
+              <input
+                type="text"
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                placeholder="Write your message..."
+                className="flex-1 bg-zinc-800/60 text-white text-xs px-4 py-2.5 rounded-xl border border-transparent focus:outline-none focus:border-zinc-700/50"
+              />
+
+              <button
+                type="submit"
+                className="p-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl cursor-pointer transition flex items-center justify-center shrink-0"
+              >
+                <Send size={16} />
+              </button>
+            </form>
+          </>
+        ) : (
+          <div className="flex-1 flex flex-col items-center justify-center text-zinc-500 gap-4">
+            <div className="w-16 h-16 bg-zinc-900 rounded-2xl flex items-center justify-center text-zinc-400 border border-zinc-800/80">
+              <Users size={24} />
+            </div>
+            <div className="text-center">
+              <h3 className="font-semibold text-sm text-zinc-300">No Chat Selected</h3>
+              <p className="text-xs text-zinc-500 mt-1">Pick a friend from the sidebar to start a conversation.</p>
+            </div>
+          </div>
+        )}
+
+        {/* DETAILS PANEL */}
+        {selectedUser && showDetailsPanel && (
+          <div className="w-72 bg-[#121212] border-l border-zinc-900 p-5 hidden lg:flex flex-col gap-6 animate-fade-in absolute right-0 top-0 bottom-0 z-20 shadow-2xl">
+            <div className="flex flex-col items-center gap-3 mt-4">
+              <div className="w-20 h-20 bg-zinc-800 rounded-2xl flex items-center justify-center text-3xl font-bold border border-zinc-700/40">
+                {selectedUser.username?.charAt(0).toUpperCase()}
+              </div>
+              <h3 className="font-bold text-base text-zinc-200">{selectedUser.username}</h3>
+              <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wider ${
+                isSelectedUserOnline ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-zinc-800/60 text-zinc-500'
+              }`}>
+                {isSelectedUserOnline ? 'Online' : 'Offline'}
+              </span>
+            </div>
+
+            <div className="border-t border-zinc-900 pt-5 space-y-4">
+              <div>
+                <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block mb-1">Local Church</span>
+                <span className="text-xs text-zinc-300 font-medium">{selectedUser.localChurch || 'Not specified'}</span>
+              </div>
+            </div>
+          </div>
+        )}
+
+      </div>
+    </div>
+  );
+};
+
+export default Messages;
