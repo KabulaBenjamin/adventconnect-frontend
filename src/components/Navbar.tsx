@@ -1,55 +1,56 @@
 import React, { useState } from 'react';
-import Sidebar from './Sidebar';
-import RightSidebar from './RightSidebar';
-import Topbar from './Topbar';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import Sidebar from './Sidebar.js';
+import RightSidebar from './RightSidebar.js';
+import Topbar from './Topbar.js';
+import { ChevronLeft, ChevronRight, Menu } from 'lucide-react';
 
-interface NavbarLayoutProps {
-  children?: React.ReactNode;
-}
-
-const Navbar: React.FC<NavbarLayoutProps> = ({ children }) => {
-  const [isCollapsed, setIsCollapsed] = useState(false);
-  const [isRightCollapsed, setIsRightCollapsed] = useState(false);
+const Navbar = ({ children }: { children: React.ReactNode }) => {
+  // isCollapsed controls the mobile-first drawer behavior
+  const [isCollapsed, setIsCollapsed] = useState(true); 
+  const [isRightCollapsed, setIsRightCollapsed] = useState(true);
 
   return (
-    <div className="flex h-screen bg-gray-50 overflow-hidden">
-      {/* 1. Left Navigation Menu Sidebar */}
+    <div className="flex h-screen w-screen overflow-hidden bg-gray-50">
+      {/* 1. Left Sidebar: Z-indexed to overlay on mobile, pushes content on desktop */}
       <Sidebar isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} />
 
-      {/* 2. Main Center Workspace Stack */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        {/* Horizontal Control Topbar with a toggle control for the Right Panel */}
-        <div className="relative flex items-center justify-between bg-white border-b border-gray-100 pr-4">
-          <div className="flex-1">
+      {/* 2. Main Workspace: Flex-1 takes remaining space, adds desktop margin for sidebar */}
+      <div className="flex flex-1 flex-col min-w-0 transition-all duration-300 md:pl-64">
+        
+        {/* Topbar: Explicitly set height and shrink-0 to prevent overlay/squashing */}
+        <header className="flex items-center justify-between bg-white border-b border-gray-100 p-2 h-16 shrink-0">
+          <button 
+            className="md:hidden p-2 text-gray-600 hover:bg-gray-100 rounded-lg" 
+            onClick={() => setIsCollapsed(!isCollapsed)}
+          >
+            <Menu size={20} />
+          </button>
+          
+          <div className="flex-1 overflow-hidden">
             <Topbar />
           </div>
-          
-          {/* Quick toggle button for the Right Sidebar */}
-          <button
-            onClick={() => setIsRightCollapsed(!isRightCollapsed)}
-            className="p-2 ml-2 rounded-xl bg-gray-50 text-gray-400 hover:bg-blue-50 hover:text-blue-600 transition-all z-50"
+
+          <button 
+            onClick={() => setIsRightCollapsed(!isRightCollapsed)} 
+            className="p-2 ml-2 bg-gray-50 rounded-xl text-gray-500 hover:text-blue-600 transition-all"
             title={isRightCollapsed ? "Open Right Sidebar" : "Collapse Right Sidebar"}
           >
             {isRightCollapsed ? <ChevronLeft size={18} /> : <ChevronRight size={18} />}
           </button>
-        </div>
+        </header>
 
-        {/* Dynamic Content Stream Page Grid */}
-        <div className="flex-1 flex overflow-hidden relative">
-          {/* Main Feed View Stream Column */}
-          <main className="flex-1 overflow-y-auto p-6 min-w-0 bg-[#F8FAFC]">
+        {/* Content Area: Occupies the rest of the height, fully scrollable */}
+        <div className="flex-1 flex overflow-hidden">
+          <main className="flex-1 overflow-y-auto p-4 md:p-6 bg-[#F8FAFC]">
             {children}
           </main>
-
-          {/* 3. Collapsable Right Sidebar utility panel */}
-          <div 
-            className={`transition-all duration-300 ease-in-out border-l border-gray-100 bg-white h-full overflow-y-auto ${
-              isRightCollapsed ? 'w-0 opacity-0 pointer-events-none' : 'w-80 opacity-100'
-            }`}
-          >
+          
+          {/* Right Sidebar: Collapsible utility panel */}
+          <aside className={`transition-all duration-300 ease-in-out border-l border-gray-100 bg-white overflow-y-auto ${
+            isRightCollapsed ? 'w-0 opacity-0' : 'w-80 opacity-100'
+          }`}>
             <RightSidebar />
-          </div>
+          </aside>
         </div>
       </div>
     </div>
