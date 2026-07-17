@@ -96,6 +96,8 @@ const CatchAllRoute = () => {
   return user ? <Navigate to="/feed" replace /> : <Navigate to="/login" replace />;
 };
 
+// ... (keep imports)
+
 function App() {
   return (
     <AuthProvider>
@@ -110,9 +112,7 @@ function App() {
               <Route path="/" element={<Navigate to="/feed" replace />} />
               <Route path="/feed" element={<Layout><Feed /></Layout>} />
               <Route path="/search" element={<Layout><SearchPage /></Layout>} />
-              
-              <Route path="/messages" element={<Messages />} />
-              
+              <Route path="/messages" element={<Layout><Messages /></Layout>} />
               <Route path="/groups" element={<Layout><Groups /></Layout>} />
               <Route path="/meetings" element={<Layout><MeetingsList /></Layout>} />
               <Route path="/trivia" element={<Layout><Trivia /></Layout>} />
@@ -123,11 +123,8 @@ function App() {
               <Route path="/admin" element={<Layout><AdminDashboard /></Layout>} />
               <Route path="/library" element={<Layout><SanctuaryLibrary /></Layout>} />
               <Route path="/devotionals" element={<Layout><Devotionals /></Layout>} />
-              
-              {/* Connected Friends Portal Route */}
               <Route path="/friends" element={<Layout><FriendsHub /></Layout>} />
-              
-              <Route path="/meeting/:roomId" element={<Meeting />} />
+              <Route path="/meeting/:roomId" element={<Layout><Meeting /></Layout>} />
             </Route>
 
             <Route path="*" element={<CatchAllRoute />} />
@@ -137,5 +134,4 @@ function App() {
     </AuthProvider>
   );
 }
-
 export default App;
